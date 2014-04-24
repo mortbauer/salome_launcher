@@ -15,7 +15,7 @@ setup(
         'Programming Language :: Python',
         'Topic :: Software Development',
         ],
-    py_modules=['salome_launcher'],
+    py_modules=['salome_launcher','setenv','salome_utils'],
     platforms='any',
     entry_points = {
         'console_scripts' :[
