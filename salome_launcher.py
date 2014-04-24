@@ -14,6 +14,7 @@ from opster import command,dispatch
 import CosNaming
 import glob
 import json
+import signal
 
 logger = logging.getLogger('salome')
 logger.setLevel(logging.DEBUG)
@@ -149,6 +150,27 @@ def launch_session(config,
     catalogs = [v['catalog'] for v in configuration['modules'].values()]
     processes = []
     rmfiles = []
+
+    def clean_up():
+        for i,proc in enumerate(processes):
+            proc.kill()
+            proc.wait()
+            if not quiet:
+                err = proc.stderr.read()
+                if err:
+                    print(err)
+        for path in rmfiles:
+            if os.path.isfile(path):
+                os.remove(path)
+            elif os.path.isdir(path):
+                shutil.rmtree(path)
+
+    def signal_handler(signum=None, frame=None):
+        ## seems useless, but maybe will need it later so leave it here anyways
+        sys.exit(0)
+
+    for sig in [signal.SIGTERM, signal.SIGINT, signal.SIGHUP, signal.SIGQUIT]:
+        signal.signal(sig, signal_handler)
     try:
         omninames,confile,logdir = start_naming_service(host,port)
         processes = [omninames]
@@ -194,18 +216,7 @@ def launch_session(config,
     except Exception as e:
         print('sorry, couldn\'t launch because of: {0}'.format(e))
     finally:
-        for i,proc in enumerate(processes):
-            proc.kill()
-            proc.wait()
-            if not quiet:
-                err = proc.stderr.read()
-                if err:
-                    print(err)
-        for path in rmfiles:
-            if os.path.isfile(path):
-                os.remove(path)
-            elif os.path.isdir(path):
-                shutil.rmtree(path)
+        clean_up()
     return
 
 @command()
