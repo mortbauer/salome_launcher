@@ -120,9 +120,9 @@ def create_and_save_config_template(modules_path,config_path):
     save_config(setenv.create_config_template(modules_path),config_path)
 
 @command()
-def launch_session(host=('h',HOST,'specify the host machine'),
+def launch_session(config,
+                   host=('h',HOST,'specify the host machine'),
                    port=('p',2815,'specify the port'),
-                   config=('c','','specify the path to the application configuration'),
                    modules=('m','','specify a list of modules to load'),
                    quiet=('',False,'don\'t print any error messages from salome'),
                    nogui=('',False,'don\'launch gui'),
@@ -209,10 +209,10 @@ def launch_session(host=('h',HOST,'specify the host machine'),
     return
 
 @command()
-def connect_session(host=('h',HOST,'specify the host machine'),
-                   port=('p',2815,'specify the port'),
-                   config=('c','','specify the path to the application configuration'),
-                   args=('','','specify args')):
+def connect_session(config,
+                    host=('h',HOST,'specify the host machine'),
+                    port=('p',2815,'specify the port'),
+                    args=('','','specify args')):
     setenv.set_env_omniorb(host,port)
     setenv.set_env(read_config(config))
     if not args:

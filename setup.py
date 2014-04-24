@@ -17,6 +17,7 @@ setup(
         ],
     py_modules=['salome_launcher','setenv','salome_utils'],
     platforms='any',
+    install_requires=['lxml'],
     entry_points = {
         'console_scripts' :[
             'salome_launcher = salome_launcher:dispatch',
