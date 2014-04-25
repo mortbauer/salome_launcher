@@ -15,6 +15,7 @@ import CosNaming
 import glob
 import json
 import signal
+import json
 
 logger = logging.getLogger('salome')
 logger.setLevel(logging.DEBUG)
@@ -64,13 +65,15 @@ def start_naming_service(host,port):
     ],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
 
     conffile = os.environ['OMNIORB_CONFIG']
+    # make sure the directory exists
     if not os.path.isdir(os.path.split(conffile)[0]):
         os.makedirs(os.path.split(conffile)[0])
+
     with open(conffile,'w') as f:
         f.write('InitRef = NameService=corbaname::{0}:{1}\n'.format(host,port))
         f.write('giopMaxMsgSize = 2097152000 # 2 GBytes\n')
         f.write('traceLevel = 0 # critical errors only\n')
-    return omninames,conffile,logdir
+    return omninames,(conffile,logdir)
 
 def start_notification_service(channelfile):
     notifd = subprocess.Popen([
@@ -172,7 +175,7 @@ def launch_session(config,
     for sig in [signal.SIGTERM, signal.SIGINT, signal.SIGHUP, signal.SIGQUIT]:
         signal.signal(sig, signal_handler)
     try:
-        omninames,confile,logdir = start_naming_service(host,port)
+        omninames,(confile,logdir) = start_naming_service(host,port)
         processes = [omninames]
         rmfiles = [confile,logdir]
 
@@ -204,6 +207,16 @@ def launch_session(config,
             poller.register(proc.stdout, select.EPOLLHUP)
             fds[proc.stdout.fileno()] = proc.stdout
 
+        # save the config to the cache to easy connect to it
+        cachedir= os.path.join(setenv.getCacheDir(),'salome_launcher')
+        # make sure it exists
+        if not os.path.isdir(cachedir):
+            os.makedirs(cachedir)
+        cachefile = os.path.join(cachedir,'{0}:{1}.json'.format(host,port))
+        with open(cachefile,'w') as store:
+            json.dump(configuration,store)
+        rmfiles.append(cachefile)
+
         print('salome running on {0}:{1}'.format(host,port))
 
         try:
@@ -220,12 +233,21 @@ def launch_session(config,
     return
 
 @command()
-def connect_session(config,
-                    host=('h',HOST,'specify the host machine'),
+def connect_session(host=('h',HOST,'specify the host machine'),
                     port=('p',2815,'specify the port'),
                     args=('','','specify args')):
     setenv.set_env_omniorb(host,port)
-    setenv.set_env(read_config(config))
+    # get the configuration
+    config = os.path.join(
+        setenv.getCacheDir(),'salome_launcher',
+        '{0}:{1}.json'.format(host,port))
+    try:
+        setenv.set_env(read_config(config))
+    except:
+        print('failed to get the configuration for {0}:{1}.\n'
+              'are you sure the server is running?'.format(host,port))
+        return False
+
     if not args:
         os.execvp('/usr/bin/zsh',['/usr/bin/zsh'])
     else:

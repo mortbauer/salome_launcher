@@ -104,7 +104,12 @@ def set_env(config, args={},silent=False):
     """
     # source a shell script
     if 'env_sh' in config:
-        source_shell_script(config['env_sh'])
+        if isinstance(config['env_sh'],Iterable) and \
+           not isinstance(config['env_sh'],unicode):
+            for path in config['env_sh']:
+                source_shell_script(path)
+        else:
+            source_shell_script(config['env_sh'])
     module_root_dirs = set()
     module_resources = set()
     # smesh_setenv assumes it is defined already
