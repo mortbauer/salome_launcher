@@ -115,7 +115,7 @@ def set_env(config, args={},silent=False):
     # smesh_setenv assumes it is defined already
     add_path('','SalomeAppConfig')
     for module, module_config in config['modules'].items():
-        os.environ['%s_ROOT_DIR'%module] = module_config['root']
+        os.environ['%s_ROOT_DIR'%module.upper()] = module_config['root']
         module_root_dirs.add(module_config['root'])
         module_resources.add(module_config['resources'])
         if sys.platform == "win32":
@@ -177,6 +177,7 @@ def set_env_omniorb(host,port,omniorb_userpath=None):
     os.environ['NSHOST'] = host
 
 def source_shell_script(path):
+    # take from http://pythonwise.blogspot.co.at/2010/04/sourcing-shell-script.html
     pipe = subprocess.Popen(
         ". %s; env"%path, stdout=subprocess.PIPE,shell=True)
     data = pipe.communicate()[0]

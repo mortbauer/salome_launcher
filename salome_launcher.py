@@ -16,6 +16,8 @@ import glob
 import json
 import signal
 import json
+import tempfile
+import traceback
 
 logger = logging.getLogger('salome')
 logger.setLevel(logging.DEBUG)
@@ -94,8 +96,8 @@ def start_salome_launcher_service(modules,catalogs,rootsdir):
     ],stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=1)
     return salome_launcher_service
 
-def start_salome_session_server(modules,catalogs,rootsdir,services=[]):
-    salome_session_server = subprocess.Popen([
+def start_salome_session_server(modules,catalogs,rootsdir,services=[],gdb=False):
+    args = [
         os.path.join(rootsdir['GUI']['bin'],'SALOME_Session_Server'),
         '--with', 'Registry', '(', '--salome_session', 'theSession', ')',
         '--with', 'ModuleCatalog',
@@ -103,8 +105,22 @@ def start_salome_session_server(modules,catalogs,rootsdir,services=[]):
         '--with', 'SALOMEDS', '(', ')',
         '--with', 'Container', '(', 'FactoryServer', ')',
         '--modules ({0})'.format(':'.join(modules)),
-    ]+services ,stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=1)
-    return salome_session_server
+    ]+services
+
+    rmfiles = []
+    if gdb:
+        # write a script which gets executed to also set the path variables
+        # correct
+        f = tempfile.NamedTemporaryFile(delete=False)
+        f.write('export LD_LIBRARY_PATH="{0}"\n'.format(
+            os.getenv('LD_LIBRARY_PATH')))
+        f.write(args[0])
+        f.write(' \'{0}\''.format(' '.join(args[1:])))
+        args = ['xterm','-e','gdb','-ex','r','--args','bash',f.name]
+        rmfiles.append(f.name)
+    salome_session_server = subprocess.Popen(
+        args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=1)
+    return salome_session_server,rmfiles
 
 def start_salome_connection_manager(modules,catalogs,rootsdir):
     salome_connection_manager = subprocess.Popen([
@@ -118,6 +134,25 @@ def start_salome_logger_server(rootsdir,logfile):
     ],stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=1)
     return salome_logger_server
 
+def start_salome_session_loader(rootsdir):
+    p = subprocess.Popen([os.path.join(
+        rootsdir['KERNEL']['bin'],'SALOME_Session_Loader'),'GUI','PY',
+    ],stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=1)
+    return p
+
+def start_salomeds_server(rootsdir):
+    p = subprocess.Popen([os.path.join(
+        rootsdir['KERNEL']['bin'],'SALOMEDS_Server'),
+    ],stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=1)
+    return p
+
+def start_salome_container_server(rootsdir):
+    p = subprocess.Popen([os.path.join(
+        rootsdir['KERNEL']['bin'],'SALOME_Container'),
+        'FactoryServer','-ORBInitRef','NameService=corbaname::localhost',
+    ],stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=1)
+    return p
+
 
 @command(usage='PATH_TO_MODULES OUTPUTFILEPATH')
 def create_and_save_config_template(modules_path,config_path):
@@ -130,7 +165,9 @@ def launch_session(config,
                    modules=('m','','specify a list of modules to load'),
                    quiet=('',False,'don\'t print any error messages from salome'),
                    nogui=('',False,'don\'launch gui'),
-                   services=('s','CPP,GUI,SPLASH','specify a list of services to load (CPP,GUI,SPLAH)')):
+                   services=('s','CPP,GUI,SPLASH','specify a list of services to load (CPP,GUI,SPLAH)'),
+                   gdb=('',False,'debug with gdb'),
+                   ):
     configuration = read_config(config)
     # by default load all modules
     if not modules:
@@ -180,15 +217,23 @@ def launch_session(config,
         rmfiles = [confile,logdir]
 
         processes.append(start_notification_service(channelfile))
+        #processes.append(start_salome_session_loader(configuration['modules']))
+        processes.append(start_salomeds_server(configuration['modules']))
+        #processes.append(start_salome_container_server(configuration['modules']))
         #salome_logger = start_salome_logger_server(
             #MODULES,LOGFILE)
 
         processes.append(
             start_salome_launcher_service(
                 modules,catalogs,configuration['modules']))
-        processes.append(
-            start_salome_session_server(
-                modules,catalogs,configuration['modules'],services=services))
+        # wait
+        import orbmodule
+        clt = orbmodule.client()
+        #clt.waitNS('/myStudyManager')
+        ssm,rmf = start_salome_session_server(
+            modules,catalogs,configuration['modules'],services=services,gdb=gdb)
+        processes.append(ssm)
+        rmfiles.extend(rmf)
         processes.append(
             start_salome_connection_manager(
                 modules,catalogs,configuration['modules']))
@@ -227,7 +272,8 @@ def launch_session(config,
             print("received interrupt, shutting done")
 
     except Exception as e:
-        print('sorry, couldn\'t launch because of: {0}'.format(e))
+        print(traceback.format_exc())
+        #print('sorry, couldn\'t launch because of: {0}'.format(e))
     finally:
         clean_up()
     return
