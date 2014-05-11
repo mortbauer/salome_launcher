@@ -264,12 +264,15 @@ def launch_session(config,
 
         print('salome running on {0}:{1}'.format(host,port))
 
-        try:
-            while run:
+        while run:
+            try:
                 for fd,flags in poller.poll(timeout=1):
                     run = False
-        except KeyboardInterrupt:
-            print("received interrupt, shutting done")
+            except KeyboardInterrupt:
+                print("received interrupt, shutting done")
+            except IOError as e:
+                logger.warn('IOError: "{0}", continuing'.format(e))
+
 
     except Exception as e:
         print(traceback.format_exc())
