@@ -34,27 +34,63 @@ def collect_module_data(modules_path):
                 root,'share','salome','resources',name.lower())
             bindir = os.path.join(root,'bin','salome')
             data[name] = {
-                'root':root,
-                'bin':bindir,
-                'lib':os.path.join(root,'lib','salome'),
-                'site-packages':site,
-                'shared_modules':os.path.join(site,'shared_modules'),
-                'resources':resources,
+                'root':os.path.abspath(root),
+                'bin':os.path.abspath(bindir),
+                'lib':os.path.abspath(os.path.join(root,'lib','salome')),
+                'site-packages':os.path.abspath(site),
+                'shared_modules':os.path.abspath(os.path.join(site,'shared_modules')),
+                'resources':os.path.abspath(resources),
                 #if not name.lower().endswith('plugin'):
-                'catalog':os.path.join(resources,'%sCatalog.xml'%name),
+                'catalog':os.path.abspath(os.path.join(resources,'%sCatalog.xml'%name)),
             }
 
     return data
 
-def create_config_template(modules_path):
+def create_config_template(modules_path,prereq_paths=[]):
     modules = collect_module_data(modules_path)
-    return {
+    config = {
         'env':{
             # SMESH expects a environment variable describing the meshers, lets create
             # it
             'SMESH_MeshersList':get_meshers(modules),
+            'HOMARD_REP_EXE':'',
+            'HOMARD_EXE':'',
         },
         'modules':modules,
+    }
+    for path in prereq_paths:
+        add_config = get_prerequisites(path)
+        for key,data in add_config.items():
+            if key in config['env']:
+                config['env'][key].extend(data)
+            else:
+                config['env'][key] = data
+    return config
+
+def get_prerequisites(prereqpath):
+    ld_library_path = []
+    path = []
+    include = []
+    pythonpath = []
+    python_version="python%d.%d" % sys.version_info[0:2]
+    for prereq in os.listdir(prereqpath):
+        libdir = os.path.join(prereqpath,prereq,'lib')
+        if os.path.isdir(libdir):
+            for sub in os.listdir(libdir):
+                if os.path.isdir(os.path.join(libdir,sub)) and prereq.split('_')[0].lower() in sub:
+                    ld_library_path.append(
+                        os.path.abspath(os.path.join(libdir,sub)))
+            ld_library_path.append(os.path.abspath(libdir))
+        if os.path.isdir(os.path.join(
+            prereqpath,prereq,'lib',python_version,'site-packages')):
+            pythonpath.append(os.path.abspath(os.path.join(
+                prereqpath,prereq,'lib',python_version,'site-packages')))
+        if os.path.isdir(os.path.join(prereqpath,prereq,'bin')):
+            path.append(os.path.abspath(os.path.join(prereqpath,prereq,'bin')))
+    return {
+        'LD_LIBRARY_PATH':ld_library_path,
+        'PATH':path,
+        'PYTHONPATH':pythonpath,
     }
 
 def get_meshers(modules_config):

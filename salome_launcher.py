@@ -155,8 +155,9 @@ def start_salome_container_server(rootsdir):
 
 
 @command(usage='PATH_TO_MODULES OUTPUTFILEPATH')
-def create_and_save_config_template(modules_path,config_path):
-    save_config(setenv.create_config_template(modules_path),config_path)
+def create_and_save_config_template(modules_path,config_path,
+                                    prereq_paths=('',[],'paths to extra prerequisites')):
+    save_config(setenv.create_config_template(modules_path,prereq_paths),config_path)
 
 @command()
 def launch_session(config,
