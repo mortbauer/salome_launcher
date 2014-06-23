@@ -201,7 +201,10 @@ def set_env(config, args={},silent=False):
     add_path(module_resources,'SalomeAppConfig')
     if 'env' in config:
         for key,val in config['env'].items():
-            add_path(val,key)
+            if isinstance(val,list):
+                add_path(val,key)
+            else:
+                os.environ[key] = val
 
 def set_env_omniorb(host,port,omniorb_userpath=None):
     if not omniorb_userpath:
