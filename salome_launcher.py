@@ -194,12 +194,13 @@ def launch_session(config,
 
     def clean_up():
         for i,proc in enumerate(processes):
-            proc.kill()
-            proc.wait()
-            if not quiet:
-                err = proc.stderr.read()
-                if err:
-                    print(err)
+            if proc.poll() == None:
+                proc.kill()
+                proc.wait()
+                if not quiet:
+                    err = proc.stderr.read()
+                    if err:
+                        print(err)
         for path in rmfiles:
             if os.path.isfile(path):
                 os.remove(path)
@@ -208,7 +209,7 @@ def launch_session(config,
 
     def signal_handler(signum=None, frame=None):
         ## seems useless, but maybe will need it later so leave it here anyways
-        sys.exit(0)
+        clean_up()
 
     for sig in [signal.SIGTERM, signal.SIGINT, signal.SIGHUP, signal.SIGQUIT]:
         signal.signal(sig, signal_handler)
