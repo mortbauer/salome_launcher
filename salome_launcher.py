@@ -294,6 +294,8 @@ def connect_session(host=('h',HOST,'specify the host machine'),
         '{0}:{1}.json'.format(host,port))
     try:
         setenv.set_env(read_config(config))
+        os.environ['CUSTOM_PROMPT_PREFIX'] = '{0} salome {host}:{port}'.format(
+            os.getenv('CUSTOM_PROMPT_PREFIX',''),host=host,port=port)
     except:
         print('failed to get the configuration for {0}:{1}.\n'
               'are you sure the server is running?'.format(host,port))
